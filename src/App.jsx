@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePwaInstall } from "./usePwaInstall.js";
 import { InstallModal } from "./InstallModal.jsx";
 import { MusicActionHandler } from "./MusicActionHandler.jsx";
+import { WeatherCard } from "./WeatherCard.jsx";
 
 const API_BASE_URL = (import.meta.env.VITE_ASSISTANT_BACKEND_URL || "").replace(/\/$/, "");
 const SESSION_STORAGE_KEY = "family-assistant-session";
@@ -65,6 +66,30 @@ function getSpeechRecognition() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
 
+function normalizeQuestion(text) {
+  return text.toLocaleLowerCase("es-AR").normalize("NFD").replace(/\p{Diacritic}/gu, "");
+}
+
+function isWeatherQuestion(text) {
+  const normalized = normalizeQuestion(text);
+  return /\b(clima|meteorolog|pronostico|temperatura|grados|llover|lluvia|llueve|llovizna|nevar|nieve|humedad|viento)\b/.test(normalized)
+    || /\bque tiempo\b/.test(normalized)
+    || /\bcomo (?:esta|va a estar|estara)(?: el)? tiempo\b/.test(normalized)
+    || /\bhace (?:el )?tiempo\b/.test(normalized)
+    || /\bcomo va a estar\b/.test(normalized);
+}
+
+function hasExplicitWeatherLocation(text) {
+  const normalized = normalizeQuestion(text);
+  if (/\b(?:donde estoy|donde me encuentro|mi ubicacion|mi ciudad|aqui|aca|en casa)\b/.test(normalized)) return false;
+  const match = normalized.match(/\b(?:en|para|de)\s+(?:(?:la|el|los|las)\s+)?(.+)$/);
+  if (!match) return false;
+  const place = match[1]
+    .replace(/\b(?:hoy|manana|pasado manana|esta semana|proximos? 7 dias|proximos? siete dias|esta tarde|esta noche|el fin de semana|este fin de semana|a las? \d{1,2}(?::\d{2})?\s*(?:hs?|horas?)?).*$/i, "")
+    .trim();
+  return place.length >= 2 && !/^(?:ahora|hoy|manana|pasado manana|esta tarde|esta noche|esta semana|el fin de semana|este fin de semana)$/i.test(place);
+}
+
 function App() {
   const storedMember = storedJson(MEMBER_STORAGE_KEY);
   const [token, setToken] = useState(() => localStorage.getItem(SESSION_STORAGE_KEY) || "");
@@ -81,7 +106,10 @@ function App() {
   const [members, setMembers] = useState([]);
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [musicData, setMusicData] = useState(null);
+  const [weatherData, setWeatherData] = useState(null);
   const musicDataRef = useRef(null);
+  const currentLocationRef = useRef(null);
+  const geolocationDeniedRef = useRef(false);
   const recognitionRef = useRef(null);
   const speechRunRef = useRef(0);
   const noticeTimerRef = useRef(null);
@@ -116,6 +144,37 @@ function App() {
     setNotice(message);
   }
 
+  async function getCurrentLocation() {
+    if (currentLocationRef.current) return currentLocationRef.current;
+    if (geolocationDeniedRef.current || !navigator.geolocation) return null;
+    try {
+      const permission = await navigator.permissions?.query({ name: "geolocation" });
+      if (permission?.state === "denied") {
+        geolocationDeniedRef.current = true;
+        return null;
+      }
+    } catch {
+      // Permissions API no está disponible en todos los navegadores.
+    }
+    return new Promise((resolve) => {
+      try {
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => {
+            currentLocationRef.current = { latitude: coords.latitude, longitude: coords.longitude };
+            resolve(currentLocationRef.current);
+          },
+          (error) => {
+            if (error.code === 1) geolocationDeniedRef.current = true;
+            resolve(null);
+          },
+          { enableHighAccuracy: false, maximumAge: 15 * 60 * 1000, timeout: 8000 },
+        );
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
   function clearSession(message = "") {
     localStorage.removeItem(SESSION_STORAGE_KEY);
     localStorage.removeItem(MEMBER_STORAGE_KEY);
@@ -130,6 +189,7 @@ function App() {
     setPhase("idle");
     setAnswer("");
     setMusicData(null);
+    setWeatherData(null);
     musicDataRef.current = null;
     if (message) showNotice(message);
   }
@@ -252,15 +312,23 @@ function App() {
     setPhase("processing");
     setAnswer("");
     setMusicData(null);
+    setWeatherData(null);
     musicDataRef.current = null;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const result = await postJson("/api/chat", {
-        question,
-        ...(conversationId ? { conversation_id: conversationId } : {}),
-      }, token, controller.signal);
-      if (result.conversation_id) {
+      const weatherQuestion = isWeatherQuestion(question);
+      const requestBody = { question };
+      if (weatherQuestion) {
+        if (!hasExplicitWeatherLocation(question)) {
+          const currentLocation = await getCurrentLocation();
+          if (currentLocation) requestBody.current_location = currentLocation;
+        }
+      } else if (conversationId) {
+        requestBody.conversation_id = conversationId;
+      }
+      const result = await postJson(weatherQuestion ? "/api/weather" : "/api/chat", requestBody, token, controller.signal);
+      if (!weatherQuestion && result.conversation_id) {
         setConversationId(result.conversation_id);
         localStorage.setItem(CONVERSATION_STORAGE_KEY, result.conversation_id);
       }
@@ -271,6 +339,7 @@ function App() {
         setMusicData(result.music);
         musicDataRef.current = result.music;
       }
+      if (result.weather) setWeatherData(result.weather);
 
       speak(text);
     } catch (error) {
@@ -301,6 +370,7 @@ function App() {
     setTranscript("");
     setAnswer("");
     setMusicData(null);
+    setWeatherData(null);
     musicDataRef.current = null;
     const recognition = new SpeechRecognition();
     recognition.lang = "es-AR";
@@ -576,6 +646,7 @@ function App() {
         {answer && (
           <p className="answer-text" aria-live="polite">{answer}</p>
         )}
+        {weatherData && <WeatherCard weather={weatherData} />}
         {musicData && (
           <MusicActionHandler
             music={musicData}
@@ -589,7 +660,7 @@ function App() {
       </section>
       <footer className="footer-note">
         <span className="privacy-dot" aria-hidden="true" />
-        Al backend se envía solo el texto
+        La ubicación solo se envía para consultas del clima
       </footer>
       <InstallModal
         isOpen={showModal}
