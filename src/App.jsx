@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePwaInstall } from "./usePwaInstall.js";
 import { InstallModal } from "./InstallModal.jsx";
+import { MusicActionHandler } from "./MusicActionHandler.jsx";
 
 const API_BASE_URL = (import.meta.env.VITE_ASSISTANT_BACKEND_URL || "").replace(/\/$/, "");
 const SESSION_STORAGE_KEY = "family-assistant-session";
@@ -79,6 +80,8 @@ function App() {
   const [passcode, setPasscode] = useState("");
   const [members, setMembers] = useState([]);
   const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [musicData, setMusicData] = useState(null);
+  const musicDataRef = useRef(null);
   const recognitionRef = useRef(null);
   const speechRunRef = useRef(0);
   const noticeTimerRef = useRef(null);
@@ -126,6 +129,8 @@ function App() {
     setAuthStep("passcode");
     setPhase("idle");
     setAnswer("");
+    setMusicData(null);
+    musicDataRef.current = null;
     if (message) showNotice(message);
   }
 
@@ -184,7 +189,9 @@ function App() {
     speechRunRef.current += 1;
     window.speechSynthesis?.cancel();
     setPhase("idle");
-    setAnswer("");
+    if (!musicDataRef.current) {
+      setAnswer("");
+    }
   }
 
   function getSpanishVoice() {
@@ -209,12 +216,16 @@ function App() {
     utterance.onend = () => {
       if (speechRunRef.current !== runId) return;
       setPhase("idle");
-      setAnswer("");
+      if (!musicDataRef.current) {
+        setAnswer("");
+      }
     };
     utterance.onerror = (event) => {
       if (speechRunRef.current !== runId) return;
       setPhase("idle");
-      setAnswer("");
+      if (!musicDataRef.current) {
+        setAnswer("");
+      }
       if (event.error !== "canceled" && event.error !== "interrupted") {
         showNotice("No pude reproducir la respuesta en voz alta.");
       }
@@ -240,6 +251,8 @@ function App() {
   async function submitQuestion(question) {
     setPhase("processing");
     setAnswer("");
+    setMusicData(null);
+    musicDataRef.current = null;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
@@ -253,6 +266,12 @@ function App() {
       }
       const text = (result.answer || result.response || "").trim();
       if (!text) throw new Error("El asistente devolvió una respuesta vacía.");
+
+      if (result.music) {
+        setMusicData(result.music);
+        musicDataRef.current = result.music;
+      }
+
       speak(text);
     } catch (error) {
       setPhase("idle");
@@ -281,6 +300,8 @@ function App() {
     setNotice("");
     setTranscript("");
     setAnswer("");
+    setMusicData(null);
+    musicDataRef.current = null;
     const recognition = new SpeechRecognition();
     recognition.lang = "es-AR";
     recognition.continuous = true;
@@ -552,8 +573,17 @@ function App() {
         {phase === "listening" && transcript && (
           <p className="transcript" aria-live="polite">{transcript}</p>
         )}
-        {phase === "speaking" && answer && (
+        {answer && (
           <p className="answer-text" aria-live="polite">{answer}</p>
+        )}
+        {musicData && (
+          <MusicActionHandler
+            music={musicData}
+            onDismiss={() => {
+              setMusicData(null);
+              musicDataRef.current = null;
+            }}
+          />
         )}
         {notice && <p className="notice home-notice" role="alert">{notice}</p>}
       </section>

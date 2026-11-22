@@ -672,6 +672,122 @@ h1 {
   }
 }
 
+/* Music Action Handler */
+.music-action-card {
+  width: min(100%, 440px);
+  margin-top: 18px;
+  padding: 16px;
+  background: linear-gradient(150deg, rgba(32, 36, 34, 0.95), rgba(24, 27, 26, 0.92));
+  border: 1px solid rgba(243, 245, 239, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  animation: fadeIn 220ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.music-action-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.music-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+}
+
+.music-dismiss-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.music-dismiss-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.music-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.music-btn {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f3f5ef;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+
+.music-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.music-btn:active {
+  transform: scale(0.98);
+}
+
+.music-btn-spotify:hover {
+  background: rgba(30, 215, 96, 0.12);
+  border-color: rgba(30, 215, 96, 0.4);
+}
+
+.music-btn-ytmusic:hover {
+  background: rgba(255, 0, 51, 0.12);
+  border-color: rgba(255, 0, 51, 0.4);
+}
+
+.music-btn-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.music-btn-label {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-btn-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.music-error {
+  margin: 0;
+  color: #ff916f;
+  font-size: 12px;
+  text-align: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
