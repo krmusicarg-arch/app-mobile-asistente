@@ -400,6 +400,248 @@ h1 {
   width: min(100%, 440px);
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.install-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(216, 255, 114, 0.08);
+  border: 1px solid rgba(216, 255, 114, 0.28);
+  color: #f3f5ef;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 180ms ease;
+  white-space: nowrap;
+}
+
+.install-pill-btn:hover {
+  background: rgba(216, 255, 114, 0.18);
+  border-color: rgba(216, 255, 114, 0.5);
+  color: #fff;
+}
+
+.install-pill-btn svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.install-hint-btn {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+
+.install-hint-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(216, 255, 114, 0.3);
+  color: #f3f5ef;
+}
+
+.install-hint-action {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.install-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 200ms ease;
+}
+
+.install-modal-card {
+  position: relative;
+  width: min(100%, 420px);
+  background: linear-gradient(150deg, rgba(32, 36, 34, 0.98), rgba(24, 27, 26, 0.95));
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: clamp(20px, 5vw, 28px);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: modalSlideUp 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.install-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.install-modal-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.install-modal-brand h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.install-subtitle {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.install-modal-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.install-modal-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.install-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.install-intro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #d8ddd5;
+}
+
+.install-steps-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.install-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: #e5eae2;
+}
+
+.step-number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #171a16;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.step-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.step-icon-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(216, 255, 114, 0.12);
+  color: var(--accent);
+}
+
+.install-native-action {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.install-highlight {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--accent);
+}
+
+.install-btn-full {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.install-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

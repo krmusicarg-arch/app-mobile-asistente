@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { usePwaInstall } from "./usePwaInstall.js";
+import { InstallModal } from "./InstallModal.jsx";
 
 const API_BASE_URL = (import.meta.env.VITE_ASSISTANT_BACKEND_URL || "").replace(/\/$/, "");
 const SESSION_STORAGE_KEY = "family-assistant-session";
@@ -80,6 +82,15 @@ function App() {
   const recognitionRef = useRef(null);
   const speechRunRef = useRef(0);
   const noticeTimerRef = useRef(null);
+
+  const {
+    installed,
+    isIos,
+    canInstallNative,
+    showModal,
+    setShowModal,
+    triggerInstall,
+  } = usePwaInstall();
 
   const hasSession = Boolean(token && member?.id);
 
@@ -378,10 +389,27 @@ function App() {
   if (!hasSession) {
     return (
       <main className="app-shell auth-shell">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true">R</span>
-          <span>Robertito</span>
-        </div>
+        <header className="topbar">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden="true">R</span>
+            <span>Robertito</span>
+          </div>
+          {!installed && (
+            <button
+              type="button"
+              className="install-pill-btn"
+              onClick={triggerInstall}
+              title="Instalar Robert en tu celular"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Instalar Robert</span>
+            </button>
+          )}
+        </header>
         <section className="auth-card" aria-labelledby="auth-title">
           <p className="eyebrow">ASISTENTE FAMILIAR</p>
           <h1 id="auth-title">
@@ -433,6 +461,13 @@ function App() {
           {notice && <p className="notice" role="alert">{notice}</p>}
         </section>
         <p className="footer-note">Al backend se envía solo el texto.</p>
+        <InstallModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          isIos={isIos}
+          canInstallNative={canInstallNative}
+          onInstallNative={triggerInstall}
+        />
       </main>
     );
   }
@@ -451,7 +486,24 @@ function App() {
           <span className="brand-mark" aria-hidden="true">R</span>
           <span>Robertito</span>
         </div>
-        <span className="member-name">{member.name}</span>
+        <div className="topbar-actions">
+          {!installed && (
+            <button
+              type="button"
+              className="install-pill-btn"
+              onClick={triggerInstall}
+              title="Instalar Robert en tu celular"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Instalar Robert</span>
+            </button>
+          )}
+          <span className="member-name">{member.name}</span>
+        </div>
       </header>
 
       <section className="assistant-stage" aria-label="Asistente por voz">
@@ -487,6 +539,16 @@ function App() {
           </button>
         </div>
         <p className="state-label" aria-live="polite">{statusText}</p>
+        {phase === "idle" && !installed && (
+          <button
+            type="button"
+            className="install-hint-btn"
+            onClick={triggerInstall}
+          >
+            <span>📲 ¿Querés usar Robert como app?</span>
+            <span className="install-hint-action">Instalar</span>
+          </button>
+        )}
         {phase === "listening" && transcript && (
           <p className="transcript" aria-live="polite">{transcript}</p>
         )}
@@ -499,6 +561,13 @@ function App() {
         <span className="privacy-dot" aria-hidden="true" />
         Al backend se envía solo el texto
       </footer>
+      <InstallModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        isIos={isIos}
+        canInstallNative={canInstallNative}
+        onInstallNative={triggerInstall}
+      />
     </main>
   );
 }
