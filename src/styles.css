@@ -687,6 +687,45 @@ h1 {
   gap: 12px;
 }
 
+.music-result {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.music-cover {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--surface-raised);
+}
+
+.music-result-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.music-title {
+  margin: 5px 0 0;
+  font-size: 17px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.music-artist,
+.music-message {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.music-message {
+  color: #d8ddd5;
+}
+
 .music-action-header {
   display: flex;
   align-items: center;
@@ -741,6 +780,7 @@ h1 {
   font-weight: 600;
   cursor: pointer;
   transition: all 180ms ease;
+  text-decoration: none;
 }
 
 .music-btn:hover {
@@ -785,6 +825,14 @@ h1 {
   margin: 0;
   color: #ff916f;
   font-size: 12px;
+  text-align: center;
+}
+
+.music-open-note {
+  margin: 0;
+  color: #899188;
+  font-size: 11px;
+  line-height: 1.4;
   text-align: center;
 }
 
