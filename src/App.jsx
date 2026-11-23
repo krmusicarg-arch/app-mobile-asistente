@@ -3,6 +3,7 @@ import { usePwaInstall } from "./usePwaInstall.js";
 import { InstallModal } from "./InstallModal.jsx";
 import { MusicActionHandler } from "./MusicActionHandler.jsx";
 import { WeatherCard } from "./WeatherCard.jsx";
+import { splitSpeechText } from "./speechText.js";
 
 const API_BASE_URL = (import.meta.env.VITE_ASSISTANT_BACKEND_URL || "").replace(/\/$/, "");
 const SESSION_STORAGE_KEY = "family-assistant-session";
@@ -256,9 +257,13 @@ function App() {
 
   function getSpanishVoice() {
     const voices = window.speechSynthesis.getVoices();
-    return voices.find((v) => v.lang.toLowerCase() === "es-ar")
-      || voices.find((v) => v.lang.toLowerCase().startsWith("es"))
-      || null;
+    const priorities = ["es-ar", "es-mx", "es-us", "es-es"];
+    for (const language of priorities) {
+      const matches = voices.filter((voice) => voice.lang.toLowerCase() === language);
+      if (matches.length) return matches.find((voice) => voice.localService) || matches[0];
+    }
+    const spanishVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith("es"));
+    return spanishVoices.find((voice) => voice.localService) || spanishVoices[0] || null;
   }
 
   function speak(text) {
@@ -268,44 +273,53 @@ function App() {
       return;
     }
 
+    const chunks = splitSpeechText(text);
     const runId = ++speechRunRef.current;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "es-AR";
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    utterance.onend = () => {
-      if (speechRunRef.current !== runId) return;
-      setPhase("idle");
-      if (!musicDataRef.current) {
-        setAnswer("");
-      }
-    };
-    utterance.onerror = (event) => {
-      if (speechRunRef.current !== runId) return;
-      setPhase("idle");
-      if (!musicDataRef.current) {
-        setAnswer("");
-      }
-      if (event.error !== "canceled" && event.error !== "interrupted") {
-        showNotice("No pude reproducir la respuesta en voz alta.");
-      }
-    };
     setAnswer(text);
     setPhase("speaking");
 
-    const voices = window.speechSynthesis.getVoices();
-    if (!voices.length) {
-      // Chrome para Android carga las voces de forma asíncrona
-      window.speechSynthesis.onvoiceschanged = () => {
-        window.speechSynthesis.onvoiceschanged = null;
+    const finishSpeech = () => {
+      if (speechRunRef.current !== runId) return;
+      setPhase("idle");
+      if (!musicDataRef.current) setAnswer("");
+    };
+    const speakChunk = (index, voice) => {
+      if (speechRunRef.current !== runId) return;
+      if (index >= chunks.length) {
+        finishSpeech();
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(chunks[index]);
+      utterance.lang = voice?.lang || "es-AR";
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      if (voice) utterance.voice = voice;
+      utterance.onend = () => speakChunk(index + 1, voice);
+      utterance.onerror = (event) => {
         if (speechRunRef.current !== runId) return;
-        utterance.voice = getSpanishVoice();
-        window.speechSynthesis.speak(utterance);
+        finishSpeech();
+        if (event.error !== "canceled" && event.error !== "interrupted") {
+          showNotice("No pude reproducir la respuesta en voz alta.");
+        }
       };
-    } else {
-      utterance.voice = getSpanishVoice();
       window.speechSynthesis.speak(utterance);
+    };
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length) {
+      speakChunk(0, getSpanishVoice());
+      return;
     }
+
+    let voiceLookupFinished = false;
+    const startWhenReady = () => {
+      if (voiceLookupFinished || speechRunRef.current !== runId) return;
+      voiceLookupFinished = true;
+      window.speechSynthesis.onvoiceschanged = null;
+      speakChunk(0, getSpanishVoice());
+    };
+    window.speechSynthesis.onvoiceschanged = startWhenReady;
+    window.setTimeout(startWhenReady, 900);
   }
 
   async function submitQuestion(question) {
