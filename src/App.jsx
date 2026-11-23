@@ -77,7 +77,10 @@ function isWeatherQuestion(text) {
     || /\bque tiempo\b/.test(normalized)
     || /\bcomo (?:esta|va a estar|estara)(?: el)? tiempo\b/.test(normalized)
     || /\bhace (?:el )?tiempo\b/.test(normalized)
-    || /\bcomo va a estar\b/.test(normalized);
+    || /\bcomo va a estar\b/.test(normalized)
+    || /\b(?:comparame|compara|comparar)\b/.test(normalized)
+    || /\bdonde hace mas calor\b/.test(normalized)
+    || /^\s*[¿¡]?y\s+en\b/.test(normalized);
 }
 
 function hasExplicitWeatherLocation(text) {

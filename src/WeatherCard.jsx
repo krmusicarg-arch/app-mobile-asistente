@@ -19,6 +19,11 @@ function temperature(value) {
 
 export function WeatherCard({ weather }) {
   if (!weather) return null;
+  if (Array.isArray(weather.locations)) {
+    return <div className="weather-comparison" aria-label="Comparación del clima">
+      {weather.locations.map((item, index) => <WeatherCard key={`${item.location?.name}-${index}`} weather={item} />)}
+    </div>;
+  }
   const location = [weather.location?.name, weather.location?.admin1, weather.location?.country]
     .filter(Boolean).filter((part, index, all) => all.indexOf(part) === index).join(", ");
 
@@ -88,7 +93,7 @@ export function WeatherCard({ weather }) {
           {weather.usedDefaultLocation && <p className="weather-default-note">Usé la localidad predeterminada porque no se compartió la ubicación.</p>}
         </>
       )}
-      <p className="weather-attribution">Datos meteorológicos: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo.com</a></p>
+      <p className="weather-attribution">Clima: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> · Lugares y capitales: <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a></p>
     </section>
   );
 }
