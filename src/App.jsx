@@ -144,6 +144,7 @@ function App() {
   const [transcript, setTranscript] = useState("");
   const [textCommand, setTextCommand] = useState("");
   const [lastTextCommand, setLastTextCommand] = useState("");
+  const [lastVoiceCommand, setLastVoiceCommand] = useState("");
   const [notice, setNotice] = useState("");
   const [authStep, setAuthStep] = useState("passcode");
   const [passcode, setPasscode] = useState("");
@@ -279,6 +280,7 @@ function App() {
     setAnswer("");
     setTextCommand("");
     setLastTextCommand("");
+    setLastVoiceCommand("");
     setMusicData(null);
     setWeatherData(null);
     setView("assistant");
@@ -529,6 +531,7 @@ function App() {
     setNotice("");
     setTranscript("");
     setLastTextCommand("");
+    setLastVoiceCommand("");
     setAnswer("");
     setMusicData(null);
     setWeatherData(null);
@@ -593,6 +596,7 @@ function App() {
         showNotice(session.error || "No llegué a escucharte. Tocá para intentar otra vez.");
         return;
       }
+      setLastVoiceCommand(question);
       void submitQuestion(question);
     };
     try {
@@ -610,7 +614,8 @@ function App() {
     if (!session) return;
     // Preservar texto interino que aún no fue confirmado como segmento final
     if (session.interim.trim()) {
-      session.finalSegments.set(session.finalSegments.size, session.interim.trim());
+      const nextIndex = Math.max(-1, ...session.finalSegments.keys()) + 1;
+      session.finalSegments.set(nextIndex, session.interim.trim());
       session.interim = "";
     }
     session.stopRequested = true;
@@ -671,6 +676,7 @@ function App() {
     setNotice("");
     setTranscript("");
     setLastTextCommand(question);
+    setLastVoiceCommand("");
     setTextCommand("");
     void submitQuestion(question);
   }
@@ -935,6 +941,11 @@ function App() {
         )}
         {lastTextCommand && (
           <p className="typed-command" aria-label="Orden enviada">{lastTextCommand}</p>
+        )}
+        {lastVoiceCommand && (
+          <p className="typed-command recognized-command" aria-label="Texto reconocido por voz">
+            <span>Escuché:</span> {lastVoiceCommand}
+          </p>
         )}
         {answer && (
           <p className="answer-text" aria-live="polite">{answer}</p>

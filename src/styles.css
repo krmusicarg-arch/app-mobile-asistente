@@ -380,6 +380,11 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.recognized-command span {
+  color: var(--accent);
+  font-weight: 750;
+}
+
 .transcript,
 .answer-text {
   max-width: min(100%, 440px);
