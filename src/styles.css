@@ -207,6 +207,32 @@ h1 {
   background: currentColor;
 }
 
+.cancel-icon {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+
+.cancel-icon::before,
+.cancel-icon::after {
+  position: absolute;
+  top: 2px;
+  left: 12px;
+  width: 3px;
+  height: 24px;
+  border-radius: 2px;
+  background: currentColor;
+  content: "";
+}
+
+.cancel-icon::before {
+  transform: rotate(45deg);
+}
+
+.cancel-icon::after {
+  transform: rotate(-45deg);
+}
+
 .spinner {
   width: 30px;
   height: 30px;

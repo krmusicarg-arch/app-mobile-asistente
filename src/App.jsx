@@ -115,6 +115,7 @@ function App() {
   const currentLocationRef = useRef(null);
   const geolocationDeniedRef = useRef(false);
   const recognitionRef = useRef(null);
+  const requestControllerRef = useRef(null);
   const speechRunRef = useRef(0);
   const noticeTimerRef = useRef(null);
 
@@ -141,6 +142,7 @@ function App() {
 
   useEffect(() => () => {
     recognitionRef.current?.recognition.abort();
+    requestControllerRef.current?.controller.abort("unmount");
     window.speechSynthesis?.cancel();
   }, []);
 
@@ -332,6 +334,8 @@ function App() {
     setWeatherData(null);
     musicDataRef.current = null;
     const controller = new AbortController();
+    const request = { controller, cancelled: false };
+    requestControllerRef.current = request;
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       const weatherQuestion = isWeatherQuestion(question);
@@ -345,6 +349,7 @@ function App() {
         requestBody.conversation_id = conversationId;
       }
       const result = await postJson(weatherQuestion ? "/api/weather" : "/api/chat", requestBody, token, controller.signal);
+      if (request.cancelled) return;
       if (!weatherQuestion && result.conversation_id) {
         setConversationId(result.conversation_id);
         localStorage.setItem(CONVERSATION_STORAGE_KEY, result.conversation_id);
@@ -360,6 +365,7 @@ function App() {
 
       speak(text);
     } catch (error) {
+      if (request.cancelled) return;
       setPhase("idle");
       setAnswer("");
       if (error.status === 401 || error.status === 403) {
@@ -373,6 +379,7 @@ function App() {
       }
     } finally {
       clearTimeout(timeout);
+      if (requestControllerRef.current === request) requestControllerRef.current = null;
     }
   }
 
@@ -481,15 +488,48 @@ function App() {
     }
   }
 
+  function cancelCurrentAction() {
+    const session = recognitionRef.current;
+    if (session) {
+      recognitionRef.current = null;
+      session.stopRequested = true;
+      try {
+        session.recognition.abort();
+      } catch {
+        // El navegador pudo haber terminado el reconocimiento.
+      }
+    }
+
+    const request = requestControllerRef.current;
+    if (request) {
+      request.cancelled = true;
+      request.controller.abort("cancelled-by-user");
+      if (requestControllerRef.current === request) requestControllerRef.current = null;
+    }
+
+    window.speechSynthesis?.cancel();
+    setTranscript("");
+    setAnswer("");
+    setMusicData(null);
+    setWeatherData(null);
+    musicDataRef.current = null;
+    setPhase("idle");
+    showNotice("Consulta cancelada.");
+  }
+
   function handleMainButton() {
     if (phase === "idle") startListening();
-    else if (phase === "listening") stopListening();
+    else if (phase === "listening") {
+      if (recognitionRef.current?.stopRequested || requestControllerRef.current) cancelCurrentAction();
+      else stopListening();
+    }
+    else if (phase === "processing") cancelCurrentAction();
     else if (phase === "speaking") endSpeech();
   }
 
   function buttonLabel() {
     if (phase === "listening") return "Terminar de hablar";
-    if (phase === "processing") return "Procesando";
+    if (phase === "processing") return "Cancelar consulta";
     if (phase === "speaking") return "Interrumpir respuesta";
     return "Hablar con Robertito";
   }
@@ -583,7 +623,7 @@ function App() {
   const statusText = {
     idle: "Tocá para hablar",
     listening: "Te escucho · tocá al terminar",
-    processing: "Estoy pensando…",
+    processing: "Estoy pensando… · tocá para cancelar",
     speaking: "Te respondo · tocá para interrumpir",
   }[phase];
 
@@ -628,7 +668,6 @@ function App() {
           <button
             aria-label={buttonLabel()}
             className={`voice-orb ${phase === "listening" ? "is-listening" : ""} ${phase === "processing" ? "is-processing" : ""} ${phase === "speaking" ? "is-speaking" : ""}`}
-            disabled={phase === "processing"}
             onClick={handleMainButton}
             type="button"
           >
@@ -636,7 +675,7 @@ function App() {
               {phase === "listening" ? (
                 <span className="stop-icon" />
               ) : phase === "processing" ? (
-                <span className="spinner" />
+                <span className="cancel-icon" />
               ) : (
                 <svg viewBox="0 0 32 32" focusable="false">
                   <rect x="11" y="4" width="10" height="17" rx="5" />
