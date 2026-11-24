@@ -139,6 +139,7 @@ function App() {
   const [musicData, setMusicData] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
   const [view, setView] = useState("assistant");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [taskScope, setTaskScope] = useState("open");
   const [reminderHours, setReminderHours] = useState(24);
   const [selectedConversationId, setSelectedConversationId] = useState("");
@@ -183,6 +184,15 @@ function App() {
       if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     };
   }, [notice]);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
 
   useEffect(() => () => {
     recognitionRef.current?.recognition.abort();
@@ -250,6 +260,7 @@ function App() {
   }
 
   function changeView(nextView) {
+    setMenuOpen(false);
     if (nextView === view) return;
     setView(nextView);
     setSelectedConversationId("");
@@ -719,24 +730,68 @@ function App() {
           <span>Robertito</span>
         </div>
         <div className="topbar-actions">
-          {!installed && (
-            <button
-              type="button"
-              className="install-pill-btn"
-              onClick={triggerInstall}
-              title="Instalar Robert en tu celular"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>Instalar Robert</span>
-            </button>
-          )}
           <span className="member-name">{member.name}</span>
+          <button
+            type="button"
+            className={`menu-toggle ${menuOpen ? "is-open" : ""}`}
+            aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={menuOpen}
+            aria-controls="app-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              {menuOpen
+                ? <path d="m6 6 12 12M18 6 6 18" />
+                : <path d="M4 6h16M4 12h16M4 18h16" />}
+            </svg>
+          </button>
         </div>
       </header>
+
+      {menuOpen && (
+        <>
+          <button
+            type="button"
+            className="menu-scrim"
+            aria-label="Cerrar menú"
+            onClick={() => setMenuOpen(false)}
+          />
+          <nav id="app-menu" className="app-menu" aria-label="Menú principal">
+            <p className="menu-kicker">TU ESPACIO</p>
+            <div className="menu-items">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={`menu-item ${view === item.key ? "is-active" : ""}`}
+                  aria-current={view === item.key ? "page" : undefined}
+                  onClick={() => changeView(item.key)}
+                >
+                  <span className="menu-item-icon"><NavIcon name={item.key} /></span>
+                  <span className="menu-item-label">{item.label}</span>
+                  {view === item.key && <span className="menu-current">Actual</span>}
+                </button>
+              ))}
+            </div>
+            {!installed && (
+              <>
+                <div className="menu-divider" />
+                <button
+                  type="button"
+                  className="menu-item menu-install"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    triggerInstall();
+                  }}
+                >
+                  <span className="menu-item-icon" aria-hidden="true">↓</span>
+                  <span className="menu-item-label">Instalar app</span>
+                </button>
+              </>
+            )}
+          </nav>
+        </>
+      )}
 
       {view === "assistant" ? (
         <>
@@ -850,22 +905,6 @@ function App() {
           )}
         </section>
       )}
-      <nav className="bottom-nav" aria-label="Secciones de la app">
-        <div className="bottom-nav-inner">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={`nav-btn ${view === item.key ? "is-active" : ""}`}
-              onClick={() => changeView(item.key)}
-              aria-current={view === item.key ? "page" : undefined}
-            >
-              <NavIcon name={item.key} />
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
       <InstallModal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
