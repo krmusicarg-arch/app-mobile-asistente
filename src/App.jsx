@@ -131,6 +131,8 @@ function App() {
   const [phase, setPhase] = useState("idle");
   const [answer, setAnswer] = useState("");
   const [transcript, setTranscript] = useState("");
+  const [textCommand, setTextCommand] = useState("");
+  const [lastTextCommand, setLastTextCommand] = useState("");
   const [notice, setNotice] = useState("");
   const [authStep, setAuthStep] = useState("passcode");
   const [passcode, setPasscode] = useState("");
@@ -248,6 +250,8 @@ function App() {
     setAuthStep("passcode");
     setPhase("idle");
     setAnswer("");
+    setTextCommand("");
+    setLastTextCommand("");
     setMusicData(null);
     setWeatherData(null);
     setView("assistant");
@@ -487,6 +491,7 @@ function App() {
 
     setNotice("");
     setTranscript("");
+    setLastTextCommand("");
     setAnswer("");
     setMusicData(null);
     setWeatherData(null);
@@ -620,6 +625,17 @@ function App() {
     }
     else if (phase === "processing") cancelCurrentAction();
     else if (phase === "speaking") endSpeech();
+  }
+
+  function sendTextCommand(event) {
+    event.preventDefault();
+    const question = textCommand.trim();
+    if (!question || phase !== "idle") return;
+    setNotice("");
+    setTranscript("");
+    setLastTextCommand(question);
+    setTextCommand("");
+    void submitQuestion(question);
   }
 
   function buttonLabel() {
@@ -827,6 +843,33 @@ function App() {
           </button>
         </div>
         <p className="state-label" aria-live="polite">{statusText}</p>
+        <form className="text-command-form" onSubmit={sendTextCommand}>
+          <label className="sr-only" htmlFor="text-command">Escribir una orden para Robertito</label>
+          <input
+            id="text-command"
+            className="text-command-input"
+            type="text"
+            value={textCommand}
+            onChange={(event) => setTextCommand(event.target.value)}
+            placeholder="Escribí una orden…"
+            autoComplete="off"
+            maxLength={1000}
+            disabled={phase !== "idle"}
+          />
+          <button
+            className="text-command-submit"
+            type="submit"
+            disabled={!textCommand.trim() || phase !== "idle"}
+            aria-label="Enviar orden escrita"
+            title="Enviar orden"
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M22 2 11 13" />
+              <path d="m22 2-7 20-4-9-9-4Z" />
+            </svg>
+          </button>
+        </form>
+        <p className="text-command-hint">También podés hablarle con el micrófono</p>
         {phase === "idle" && !installed && (
           <button
             type="button"
@@ -839,6 +882,9 @@ function App() {
         )}
         {phase === "listening" && transcript && (
           <p className="transcript" aria-live="polite">{transcript}</p>
+        )}
+        {lastTextCommand && (
+          <p className="typed-command" aria-label="Orden enviada">{lastTextCommand}</p>
         )}
         {answer && (
           <p className="answer-text" aria-live="polite">{answer}</p>
