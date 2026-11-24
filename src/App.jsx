@@ -6,6 +6,8 @@ import { WeatherCard } from "./WeatherCard.jsx";
 import { splitSpeechText } from "./speechText.js";
 import { postJson } from "./api.js";
 import { useReadPanel } from "./useReadPanel.js";
+import { useFamilyMessages } from "./useFamilyMessages.js";
+import { FamilyMessagesView } from "./FamilyMessagesView.jsx";
 import { AgendaView, TasksView, RemindersView, HistoryView } from "./InsightsViews.jsx";
 
 const SESSION_STORAGE_KEY = "family-assistant-session";
@@ -65,6 +67,7 @@ const NAV_ITEMS = [
   { key: "agenda", label: "Mi día" },
   { key: "tasks", label: "Tareas" },
   { key: "reminders", label: "Avisos" },
+  { key: "messages", label: "Mensajes" },
   { key: "history", label: "Historial" },
 ];
 
@@ -113,6 +116,14 @@ function NavIcon({ name }) {
       </svg>
     );
   }
+  if (name === "messages") {
+    return (
+      <svg {...props}>
+        <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-5.5A7.5 7.5 0 1 1 20 11.5Z" />
+        <path d="M8 11h8M8 14.5h5" />
+      </svg>
+    );
+  }
   return (
     <svg {...props}>
       <rect x="9" y="2.5" width="6" height="11" rx="3" />
@@ -150,6 +161,7 @@ function App() {
   const geolocationDeniedRef = useRef(false);
   const recognitionRef = useRef(null);
   const requestControllerRef = useRef(null);
+  const messageRequestRef = useRef(null);
   const speechRunRef = useRef(0);
   const noticeTimerRef = useRef(null);
 
@@ -166,6 +178,10 @@ function App() {
     token,
     onUnauthorized: () => clearSession("La sesión venció. Ingresá nuevamente el código familiar."),
   });
+  const familyMessages = useFamilyMessages({
+    token,
+    onUnauthorized: () => clearSession("La sesión venció. Ingresá nuevamente el código familiar."),
+  });
 
   const hasSession = Boolean(token && member?.id);
 
@@ -175,6 +191,7 @@ function App() {
     else if (view === "tasks") void panel.loadTasks(taskScope);
     else if (view === "reminders") void panel.loadReminders(reminderHours);
     else if (view === "history") void panel.loadConversations();
+    else if (view === "messages") void familyMessages.load();
   }, [view, hasSession]);
 
   useEffect(() => {
@@ -204,6 +221,16 @@ function App() {
 
   function showNotice(message) {
     setNotice(message);
+  }
+
+  function requestIdForQuestion(question) {
+    const signature = question.trim();
+    const pending = messageRequestRef.current;
+    if (pending?.signature === signature && Date.now() - pending.createdAt < 120000) return pending.id;
+    const id = globalThis.crypto?.randomUUID?.();
+    if (!id) return null;
+    messageRequestRef.current = { signature, id, createdAt: Date.now() };
+    return id;
   }
 
   async function getCurrentLocation() {
@@ -265,7 +292,10 @@ function App() {
 
   function changeView(nextView) {
     setMenuOpen(false);
-    if (nextView === view) return;
+    if (nextView === view) {
+      if (nextView === "messages") void familyMessages.load();
+      return;
+    }
     setView(nextView);
     setSelectedConversationId("");
     panel.reset();
@@ -447,7 +477,14 @@ function App() {
       } else if (conversationId) {
         requestBody.conversation_id = conversationId;
       }
+      if (!weatherQuestion) {
+        const requestId = requestIdForQuestion(question);
+        if (requestId) requestBody.request_id = requestId;
+      }
       const result = await postJson(weatherQuestion ? "/api/weather" : "/api/chat", requestBody, token, controller.signal);
+      if (requestBody.request_id && messageRequestRef.current?.id === requestBody.request_id) {
+        messageRequestRef.current = null;
+      }
       if (request.cancelled) return;
       if (!weatherQuestion && result.conversation_id) {
         setConversationId(result.conversation_id);
@@ -749,6 +786,19 @@ function App() {
           <span className="member-name">{member.name}</span>
           <button
             type="button"
+            className={`message-bell ${view === "messages" ? "is-active" : ""}`}
+            aria-label={familyMessages.unreadCount ? `Mensajes, ${familyMessages.unreadCount} sin leer` : "Mensajes familiares"}
+            title="Mensajes familiares"
+            onClick={() => changeView("messages")}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
+              <path d="M10 20a2 2 0 0 0 4 0" />
+            </svg>
+            {familyMessages.unreadCount > 0 && <span className="message-bell-count">{familyMessages.unreadCount > 99 ? "99+" : familyMessages.unreadCount}</span>}
+          </button>
+          <button
+            type="button"
             className={`menu-toggle ${menuOpen ? "is-open" : ""}`}
             aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={menuOpen}
@@ -947,6 +997,21 @@ function App() {
               loading={panel.loading}
               error={panel.error}
               onRefresh={() => panel.loadConversations()}
+            />
+          )}
+          {view === "messages" && (
+            <FamilyMessagesView
+              messages={familyMessages.messages}
+              members={familyMessages.members.length ? familyMessages.members : members}
+              member={member}
+              unreadCount={familyMessages.unreadCount}
+              loading={familyMessages.loading}
+              error={familyMessages.error}
+              hasMore={familyMessages.hasMore}
+              onRefresh={() => familyMessages.load()}
+              onLoadMore={() => familyMessages.load({ append: true })}
+              onSend={(message) => familyMessages.send(message)}
+              onRead={(messageId) => familyMessages.markRead(messageId)}
             />
           )}
         </section>
