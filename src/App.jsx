@@ -4,8 +4,10 @@ import { InstallModal } from "./InstallModal.jsx";
 import { MusicActionHandler } from "./MusicActionHandler.jsx";
 import { WeatherCard } from "./WeatherCard.jsx";
 import { splitSpeechText } from "./speechText.js";
+import { postJson } from "./api.js";
+import { useReadPanel } from "./useReadPanel.js";
+import { AgendaView, TasksView, RemindersView, HistoryView } from "./InsightsViews.jsx";
 
-const API_BASE_URL = (import.meta.env.VITE_ASSISTANT_BACKEND_URL || "").replace(/\/$/, "");
 const SESSION_STORAGE_KEY = "family-assistant-session";
 const MEMBER_STORAGE_KEY = "family-assistant-member";
 const CONVERSATION_STORAGE_KEY = "family-assistant-conversation";
@@ -25,42 +27,6 @@ function storedJson(key) {
   } catch {
     return null;
   }
-}
-
-function apiUrl(path) {
-  return `${API_BASE_URL}${path}`;
-}
-
-async function postJson(path, body, token, signal) {
-  const response = await fetch(apiUrl(path), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(body),
-    signal,
-  });
-  let payload;
-  try {
-    payload = await response.json();
-  } catch {
-    throw new Error("El servidor devolvió una respuesta inválida.");
-  }
-  if (!response.ok) {
-    const messages = {
-      invalid_passcode: "El código familiar no es correcto.",
-      invalid_speaker: "Ese integrante ya no está disponible.",
-      speaker_mismatch: "La sesión no corresponde al integrante seleccionado.",
-    };
-    const error = new Error(
-      payload.answer || messages[payload.status] || "No pude completar la consulta.",
-    );
-    error.status = response.status;
-    error.code = payload.status;
-    throw error;
-  }
-  return payload;
 }
 
 function getSpeechRecognition() {
@@ -94,6 +60,67 @@ function hasExplicitWeatherLocation(text) {
   return place.length >= 2 && !/^(?:ahora|hoy|manana|pasado manana|esta tarde|esta noche|esta semana|el fin de semana|este fin de semana)$/i.test(place);
 }
 
+const NAV_ITEMS = [
+  { key: "assistant", label: "Hablar" },
+  { key: "agenda", label: "Mi día" },
+  { key: "tasks", label: "Tareas" },
+  { key: "reminders", label: "Avisos" },
+  { key: "history", label: "Historial" },
+];
+
+function NavIcon({ name }) {
+  const props = {
+    width: 20,
+    height: 20,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": true,
+  };
+  if (name === "agenda") {
+    return (
+      <svg {...props}>
+        <rect x="3" y="4.5" width="18" height="16" rx="3" />
+        <path d="M3 9h18M8 2.5v4M16 2.5v4" />
+      </svg>
+    );
+  }
+  if (name === "tasks") {
+    return (
+      <svg {...props}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="m8.5 12 2.5 2.5 4.5-5" />
+      </svg>
+    );
+  }
+  if (name === "reminders") {
+    return (
+      <svg {...props}>
+        <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
+        <path d="M10.3 21a2 2 0 0 0 3.4 0" />
+      </svg>
+    );
+  }
+  if (name === "history") {
+    return (
+      <svg {...props}>
+        <path d="M3 12a9 9 0 1 0 3-6.7" />
+        <polyline points="3 3 3 9 9 9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...props}>
+      <rect x="9" y="2.5" width="6" height="11" rx="3" />
+      <path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3M9 22h6" />
+    </svg>
+  );
+}
+
 function App() {
   const storedMember = storedJson(MEMBER_STORAGE_KEY);
   const [token, setToken] = useState(() => localStorage.getItem(SESSION_STORAGE_KEY) || "");
@@ -111,6 +138,10 @@ function App() {
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [musicData, setMusicData] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
+  const [view, setView] = useState("assistant");
+  const [taskScope, setTaskScope] = useState("open");
+  const [reminderHours, setReminderHours] = useState(24);
+  const [selectedConversationId, setSelectedConversationId] = useState("");
   const musicDataRef = useRef(null);
   const currentLocationRef = useRef(null);
   const geolocationDeniedRef = useRef(false);
@@ -128,7 +159,20 @@ function App() {
     triggerInstall,
   } = usePwaInstall();
 
+  const panel = useReadPanel({
+    token,
+    onUnauthorized: () => clearSession("La sesión venció. Ingresá nuevamente el código familiar."),
+  });
+
   const hasSession = Boolean(token && member?.id);
+
+  useEffect(() => {
+    if (!hasSession) return;
+    if (view === "agenda") void panel.loadAgenda();
+    else if (view === "tasks") void panel.loadTasks(taskScope);
+    else if (view === "reminders") void panel.loadReminders(reminderHours);
+    else if (view === "history") void panel.loadConversations();
+  }, [view, hasSession]);
 
   useEffect(() => {
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
@@ -196,8 +240,48 @@ function App() {
     setAnswer("");
     setMusicData(null);
     setWeatherData(null);
+    setView("assistant");
+    setTaskScope("open");
+    setReminderHours(24);
+    setSelectedConversationId("");
     musicDataRef.current = null;
+    panel.reset();
     if (message) showNotice(message);
+  }
+
+  function changeView(nextView) {
+    if (nextView === view) return;
+    setView(nextView);
+    setSelectedConversationId("");
+    panel.reset();
+  }
+
+  function changeTaskScope(nextScope) {
+    setTaskScope(nextScope);
+    void panel.loadTasks(nextScope);
+  }
+
+  function changeReminderHours(nextHours) {
+    setReminderHours(nextHours);
+    void panel.loadReminders(nextHours);
+  }
+
+  function openConversation(conversationId) {
+    setSelectedConversationId(conversationId);
+    void panel.loadMessages(conversationId);
+  }
+
+  function closeConversation() {
+    setSelectedConversationId("");
+  }
+
+  async function loadAgendaWeather() {
+    const location = await getCurrentLocation();
+    if (!location) {
+      showNotice("No pude obtener tu ubicación. Revisá los permisos del navegador.");
+      return;
+    }
+    void panel.loadAgenda(location);
   }
 
   async function loadMembers(event) {
@@ -654,6 +738,8 @@ function App() {
         </div>
       </header>
 
+      {view === "assistant" ? (
+        <>
       <section className="assistant-stage" aria-label="Asistente por voz">
         <div className="assistant-copy">
           <p className="eyebrow">ASISTENTE FAMILIAR</p>
@@ -718,6 +804,68 @@ function App() {
         <span className="privacy-dot" aria-hidden="true" />
         La ubicación solo se envía para consultas del clima
       </footer>
+        </>
+      ) : (
+        <section className="panel-stage">
+          {view === "agenda" && (
+            <AgendaView
+              agenda={panel.agenda}
+              loading={panel.loading}
+              error={panel.error}
+              onRefresh={() => panel.loadAgenda()}
+              onWeather={loadAgendaWeather}
+            />
+          )}
+          {view === "tasks" && (
+            <TasksView
+              tasks={panel.tasks}
+              scope={taskScope}
+              onScopeChange={changeTaskScope}
+              loading={panel.loading}
+              error={panel.error}
+              onRefresh={() => panel.loadTasks(taskScope)}
+            />
+          )}
+          {view === "reminders" && (
+            <RemindersView
+              reminders={panel.reminders}
+              hours={reminderHours}
+              onHoursChange={changeReminderHours}
+              loading={panel.loading}
+              error={panel.error}
+              onRefresh={() => panel.loadReminders(reminderHours)}
+            />
+          )}
+          {view === "history" && (
+            <HistoryView
+              conversations={panel.conversations}
+              messages={panel.messages}
+              selectedId={selectedConversationId}
+              onSelect={openConversation}
+              onBack={closeConversation}
+              loading={panel.loading}
+              error={panel.error}
+              onRefresh={() => panel.loadConversations()}
+            />
+          )}
+        </section>
+      )}
+      <nav className="bottom-nav" aria-label="Secciones de la app">
+        <div className="bottom-nav-inner">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={`nav-btn ${view === item.key ? "is-active" : ""}`}
+              onClick={() => changeView(item.key)}
+              aria-current={view === item.key ? "page" : undefined}
+            >
+              <NavIcon name={item.key} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
       <InstallModal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
