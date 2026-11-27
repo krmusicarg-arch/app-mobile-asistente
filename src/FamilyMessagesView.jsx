@@ -26,6 +26,7 @@ export function FamilyMessagesView({
   const [recipientId, setRecipientId] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
+  const [sendNotice, setSendNotice] = useState("");
   const [readError, setReadError] = useState("");
   const pendingRequest = useRef(null);
 
@@ -34,6 +35,7 @@ export function FamilyMessagesView({
     if (!content.trim() || sending) return;
     setSending(true);
     setSendError("");
+    setSendNotice("");
     const signature = `${recipientId || "all"}|${content.trim()}`;
     if (pendingRequest.current?.signature !== signature) {
       pendingRequest.current = {
@@ -43,7 +45,20 @@ export function FamilyMessagesView({
     }
     try {
       if (!pendingRequest.current.id) throw new Error("Este navegador no puede generar una clave segura para el envío.");
-      await onSend({ content: content.trim(), recipientId: recipientId || null, requestId: pendingRequest.current.id });
+      const result = await onSend({ content: content.trim(), recipientId: recipientId || null, requestId: pendingRequest.current.id });
+      const deliveries = result?.telegramDelivery;
+      if (deliveries?.length) {
+        const failures = deliveries.filter((delivery) => delivery.status === "failed");
+        if (failures.length) {
+          const names = failures.map((delivery) => members.find((item) => item.id === delivery.memberId)?.name || "un integrante");
+          const needsPrivateChat = failures.some((delivery) => delivery.reason === "must_start_private_chat");
+          setSendNotice(`El mensaje quedó en el historial familiar, pero no llegó por Telegram a ${names.join(", ")}.${needsPrivateChat ? " Esa persona tiene que iniciar primero una conversación privada con el bot." : ""}`);
+        } else {
+          setSendNotice("Mensaje registrado y enviado por Telegram.");
+        }
+      } else {
+        setSendNotice("Mensaje registrado en el historial familiar.");
+      }
       pendingRequest.current = null;
       setContent("");
     } catch (requestError) {
@@ -90,6 +105,7 @@ export function FamilyMessagesView({
           </button>
         </div>
         {sendError && <p className="notice" role="alert">{sendError}</p>}
+        {sendNotice && <p className="notice" role="status">{sendNotice}</p>}
       </form>
 
       <div className="family-message-history-head">
@@ -119,6 +135,7 @@ export function FamilyMessagesView({
                   </span>
                   <span className="family-message-destination">
                     {message.recipientName ? `Para ${message.recipientName}` : "Para toda la familia"}
+                    {message.sourceChannel === "telegram_group" && <b>Grupo de Telegram</b>}
                     {message.isPriorityForMe && <b>Para vos</b>}
                     {ownReceipt && !ownReceipt.readAt && <i>Nuevo</i>}
                   </span>
