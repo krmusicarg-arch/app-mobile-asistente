@@ -141,6 +141,7 @@ function App() {
   );
   const [phase, setPhase] = useState("idle");
   const [answer, setAnswer] = useState("");
+  const [voicePending, setVoicePending] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [textCommand, setTextCommand] = useState("");
   const [lastTextCommand, setLastTextCommand] = useState("");
@@ -385,6 +386,7 @@ function App() {
   function endSpeech() {
     speechRunRef.current += 1;
     window.speechSynthesis?.cancel();
+    setVoicePending(false);
     setPhase("idle");
     if (!musicDataRef.current) {
       setAnswer("");
@@ -402,7 +404,7 @@ function App() {
     return spanishVoices.find((voice) => voice.localService) || spanishVoices[0] || null;
   }
 
-  function speak(text) {
+  function speak(text, { triggeredByTap = false } = {}) {
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
       setPhase("idle");
       showNotice("La voz no está disponible en este dispositivo.");
@@ -411,11 +413,13 @@ function App() {
 
     const chunks = splitSpeechText(text);
     const runId = ++speechRunRef.current;
+    setVoicePending(false);
     setAnswer(text);
     setPhase("speaking");
 
     const finishSpeech = () => {
       if (speechRunRef.current !== runId) return;
+      setVoicePending(false);
       setPhase("idle");
       if (!musicDataRef.current) setAnswer("");
     };
@@ -442,6 +446,26 @@ function App() {
     };
 
     const voices = window.speechSynthesis.getVoices();
+    if (triggeredByTap) {
+      const voice = getSpanishVoice();
+      chunks.forEach((chunk, index) => {
+        const utterance = new SpeechSynthesisUtterance(chunk);
+        utterance.lang = voice?.lang || "es-AR";
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        if (voice) utterance.voice = voice;
+        if (index === chunks.length - 1) utterance.onend = finishSpeech;
+        utterance.onerror = (event) => {
+          if (speechRunRef.current !== runId) return;
+          finishSpeech();
+          if (event.error !== "canceled" && event.error !== "interrupted") {
+            showNotice("No pude reproducir la respuesta en voz alta.");
+          }
+        };
+        window.speechSynthesis.speak(utterance);
+      });
+      return;
+    }
     if (voices.length) {
       speakChunk(0, getSpanishVoice());
       return;
@@ -461,6 +485,7 @@ function App() {
   async function submitQuestion(question) {
     setPhase("processing");
     setAnswer("");
+    setVoicePending(false);
     setMusicData(null);
     setWeatherData(null);
     musicDataRef.current = null;
@@ -501,11 +526,18 @@ function App() {
       }
       if (result.weather) setWeatherData(result.weather);
 
-      speak(text);
+      if (isIos) {
+        setAnswer(text);
+        setVoicePending(true);
+        setPhase("idle");
+      } else {
+        speak(text);
+      }
     } catch (error) {
       if (request.cancelled) return;
       setPhase("idle");
       setAnswer("");
+      setVoicePending(false);
       if (error.status === 401 || error.status === 403) {
         clearSession("La sesión venció. Ingresá nuevamente el código familiar.");
       } else if (error.name === "AbortError") {
@@ -652,6 +684,7 @@ function App() {
     window.speechSynthesis?.cancel();
     setTranscript("");
     setAnswer("");
+    setVoicePending(false);
     setMusicData(null);
     setWeatherData(null);
     musicDataRef.current = null;
@@ -667,6 +700,11 @@ function App() {
     }
     else if (phase === "processing") cancelCurrentAction();
     else if (phase === "speaking") endSpeech();
+  }
+
+  function playAnswer() {
+    if (!answer || !voicePending) return;
+    speak(answer, { triggeredByTap: true });
   }
 
   function sendTextCommand(event) {
@@ -948,7 +986,18 @@ function App() {
           </p>
         )}
         {answer && (
-          <p className="answer-text" aria-live="polite">{answer}</p>
+          <>
+            <p className="answer-text" aria-live="polite">{answer}</p>
+            {isIos && voicePending && (
+              <button className="answer-speak-btn" type="button" onClick={playAnswer}>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+                  <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+                </svg>
+                Tocar para escuchar
+              </button>
+            )}
+          </>
         )}
         {weatherData && <WeatherCard weather={weatherData} />}
         {musicData && (

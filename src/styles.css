@@ -400,6 +400,44 @@ h1 {
   color: #f3f5ef;
 }
 
+.answer-speak-btn {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin: 12px 0 0;
+  padding: 0 16px;
+  border: 1px solid rgba(216, 255, 114, 0.32);
+  border-radius: 14px;
+  background: rgba(216, 255, 114, 0.1);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.answer-speak-btn:active {
+  transform: scale(0.97);
+}
+
+.answer-speak-btn:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.answer-speak-btn svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .notice {
   width: 100%;
   margin: 18px 0 0;
